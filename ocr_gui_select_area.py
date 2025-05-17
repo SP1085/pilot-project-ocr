@@ -1,0 +1,100 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
+import pytesseract
+import cv2
+import numpy as np
+
+# Global variables
+image_path = None
+cv_image = None
+start_x = start_y = end_x = end_y = 0
+rect_id = None
+
+def select_image():
+    global image_path, cv_image
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
+    if file_path:
+        image_path = file_path
+        cv_image = cv2.imread(image_path)
+        show_image(cv_image)
+
+def show_image(img):
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    pil_img = Image.fromarray(img_rgb)
+    pil_img = pil_img.resize((600, 400))
+    tk_img = ImageTk.PhotoImage(pil_img)
+
+    canvas.image = tk_img
+    canvas.create_image(0, 0, anchor=tk.NW, image=tk_img)
+
+def on_mouse_down(event):
+    global start_x, start_y
+    start_x = event.x
+    start_y = event.y
+    clear_rectangle()
+
+def on_mouse_drag(event):
+    global rect_id
+    clear_rectangle()
+    rect_id = canvas.create_rectangle(start_x, start_y, event.x, event.y, outline="red", width=2)
+
+def on_mouse_up(event):
+    global end_x, end_y
+    end_x = event.x
+    end_y = event.y
+    perform_ocr()
+
+def clear_rectangle():
+    global rect_id
+    if rect_id:
+        canvas.delete(rect_id)
+        rect_id = None
+
+def perform_ocr():
+    if cv_image is None:
+        messagebox.showwarning("ยังไม่ได้เปิดภาพ", "กรุณาเลือกรูปภาพก่อน")
+        return
+
+    # แปลงพิกัดจาก canvas → ภาพจริง
+    x_scale = cv_image.shape[1] / 600
+    y_scale = cv_image.shape[0] / 400
+
+    x1 = int(min(start_x, end_x) * x_scale)
+    y1 = int(min(start_y, end_y) * y_scale)
+    x2 = int(max(start_x, end_x) * x_scale)
+    y2 = int(max(start_y, end_y) * y_scale)
+
+    # ป้องกัน index หลุด
+    x1, x2 = max(0, x1), min(cv_image.shape[1], x2)
+    y1, y2 = max(0, y1), min(cv_image.shape[0], y2)
+
+    if x2 <= x1 or y2 <= y1:
+        messagebox.showwarning("เลือกตำแหน่งไม่ถูกต้อง", "กรุณาลากเมาส์เลือกบริเวณป้ายทะเบียนใหม่อีกครั้ง")
+        return
+
+    cropped = cv_image[y1:y2, x1:x2]
+    gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+    text = pytesseract.image_to_string(gray, lang='tha+eng')
+
+    result_text.set(text.strip())
+    print("OCR Text:", text.strip())
+
+# ==== GUI ====
+window = tk.Tk()
+window.title("OCR อ่านตัวหนังสือ - ลากเมาส์เลือกตำแหน่ง")
+window.geometry("650x550")
+
+tk.Button(window, text="เลือกรูปภาพ", command=select_image).pack(pady=10)
+
+canvas = tk.Canvas(window, width=600, height=400, bg="gray")
+canvas.pack()
+canvas.bind("<Button-1>", on_mouse_down)
+canvas.bind("<B1-Motion>", on_mouse_drag)
+canvas.bind("<ButtonRelease-1>", on_mouse_up)
+
+result_text = tk.StringVar()
+tk.Label(window, text="ข้อความที่อ่านได้:", font=("Arial", 12)).pack(pady=5)
+tk.Label(window, textvariable=result_text, font=("Arial", 14), fg="blue", wraplength=600).pack()
+
+window.mainloop()
