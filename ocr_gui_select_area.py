@@ -95,6 +95,6 @@ canvas.bind("<ButtonRelease-1>", on_mouse_up)
 
 result_text = tk.StringVar()
 tk.Label(window, text="ข้อความที่อ่านได้:", font=("Arial", 12)).pack(pady=5)
-tk.Label(window, textvariable=result_text, font=("Arial", 14), fg="blue", wraplength=600).pack()
+tk.Label(window, textvariable=result_text, font=("Arial", 14), fg="white", wraplength=600).pack()
 
 window.mainloop()
